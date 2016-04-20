@@ -33,7 +33,9 @@ type JSONParseOpts struct {
 // NewJSONParser builds a JSONParser. You will usually want to use parse.JSON instead
 func NewJSONParser() *JSONParser {
 	parser := &JSONParser{
-		Log: ingest.DefaultLogger.WithField("task", "parse-json"),
+		Log:       ingest.DefaultLogger.WithField("task", "parse-json"),
+		ownOutput: true,
+		output:    make(chan interface{}),
 	}
 
 	defaults.SetDefaults(&parser.Opts)
@@ -133,9 +135,13 @@ func (j *JSONParser) startDecodeWorker(ctrl *ingest.Controller) {
 							ctrl.Err <- err
 							return
 						}
-						log := j.Log
-						if asUnmarshalTypeErr, isUnmarshalTypeErr := err.(*json.UnmarshalTypeError); isUnmarshalTypeErr {
-							log = log.WithField("offset", asUnmarshalTypeErr.Offset).WithField("value", asUnmarshalTypeErr.Value)
+
+						log := j.Log.WithError(err)
+						switch err := err.(type) {
+						case *json.UnmarshalTypeError:
+							log = log.WithField("offset", err.Offset).WithField("value", err.Value)
+						case *json.SyntaxError:
+							log = log.WithField("offset", err.Offset)
 						}
 						log.Warn("Error unmarshalling JSON record")
 					}
@@ -163,11 +169,11 @@ func (j *JSONParser) Decode(reader io.Reader, abort chan struct{}) (done chan st
 			case <-abort:
 				return
 			default:
+				if !decoder.More() {
+					return
+				}
 				rec := j.newRec()
 				if err := decoder.Decode(rec); err != nil {
-					if err == io.EOF {
-						return
-					}
 					errs <- err
 					if j.Opts.AbortOnError {
 						return
@@ -189,6 +195,10 @@ func (j *JSONParser) Decode(reader io.Reader, abort chan struct{}) (done chan st
 func (j *JSONParser) navigateToSelection(decoder *json.Decoder) error {
 	nestIn := strings.Split(j.Opts.Selection, ".")
 	for len(nestIn) > 0 {
+		if nestIn[0] == "" {
+			nestIn = nestIn[1:]
+			continue
+		}
 		token, err := decoder.Token()
 		if err != nil {
 			return err
