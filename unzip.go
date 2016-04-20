@@ -110,6 +110,7 @@ func (u *Unzipper) startUnzipWorker(ctrl *Controller, input <-chan *os.File, out
 	u.Log.Debug("Starting worker")
 	go func() {
 		defer ctrl.WorkerEnd()
+		defer u.Log.Debug("Exiting worker")
 		for {
 			select {
 			case <-ctrl.Quit:

@@ -61,8 +61,9 @@ func Download(urls ...string) *Downloader {
 func (d *Downloader) Start(ctrl *Controller) <-chan *os.File {
 	result := make(chan *os.File)
 	queue := d.downloadQueue()
+
 	childCtrl := ctrl.Child()
-	defer ctrl.ChildBuilt()
+	defer childCtrl.ChildBuilt()
 
 	go func() {
 		ctrl.Wait()
@@ -182,6 +183,7 @@ func (d *Downloader) startDownloadWorker(ctrl *Controller, queue <-chan string, 
 	ctrl.WorkerStart()
 	go func() {
 		defer ctrl.WorkerEnd()
+		defer d.Log.Debug("Exiting worker")
 		for {
 			select {
 			case <-ctrl.Quit:

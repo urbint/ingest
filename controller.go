@@ -53,8 +53,8 @@ func (c *Controller) Wait() {
 }
 
 // Done returns a channel that will be closed when the worker controller has finished
-func (c *Controller) Done() chan bool {
-	done := make(chan bool)
+func (c *Controller) Done() chan struct{} {
+	done := make(chan struct{})
 	go func() {
 		c.workerWg.Wait()
 		close(done)
@@ -100,6 +100,8 @@ func (c *Controller) Child() *Controller {
 				c.Err <- err
 			case <-c.Quit:
 				close(child.Quit)
+				return
+			case <-child.Done():
 				return
 			}
 		}

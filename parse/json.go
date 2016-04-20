@@ -116,6 +116,7 @@ func (j *JSONParser) startDecodeWorker(ctrl *ingest.Controller) {
 	j.Log.Debug("Starting worker")
 	go func() {
 		defer ctrl.WorkerEnd()
+		defer j.Log.Debug("Exiting worker")
 	WorkerAvailable:
 		for {
 			select {
