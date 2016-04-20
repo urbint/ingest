@@ -199,8 +199,11 @@ func (c *CSVParser) startDecodeWorker(ctrl *ingest.Controller) {
 				done, errs := c.Decode(reader, ctrl.Quit)
 				for {
 					select {
-					case <-done:
-						continue WorkerAvailable
+					case rec, ok := <-done:
+						if !ok {
+							continue WorkerAvailable
+						}
+						c.Out <- rec
 					case err := <-errs:
 						if c.Opts.AbortOnError {
 							ctrl.Err <- err
@@ -253,7 +256,7 @@ func (c *CSVParser) parseRowWithFieldMap(row []string, fieldMap map[int][]int) (
 			continue
 		}
 
-		field := instance.Elem()
+		field := instance
 		for _, fieldIndex := range fieldIndicies {
 			field = field.Field(fieldIndex)
 		}
