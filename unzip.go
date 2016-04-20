@@ -55,7 +55,7 @@ func (u *Unzipper) Start(ctrl *Controller) <-chan io.ReadCloser {
 		close(unzipped)
 	}()
 
-	files := Download(u.URLs...).Start(ctrl)
+	files := Download(u.URLs...).WithOpts(u.Opts.DownloadOpts).Start(ctrl)
 
 	for i := 0; i < u.Opts.MaxParallelUnzips; i++ {
 		u.startUnzipWorker(ctrl, files, unzipped)
@@ -70,6 +70,13 @@ func (u *Unzipper) Start(ctrl *Controller) <-chan io.ReadCloser {
 // It returns the unzipper for a chainable API
 func (u *Unzipper) Filter(pattern string) *Unzipper {
 	u.Opts.Filter = pattern
+	return u
+}
+
+// Cleanup is a chainable configuration method to set whether the directory referred to
+// by DownloadOpts.DownloadTo will be removed when the invoking controller finishes
+func (u *Unzipper) Cleanup(cleanup bool) *Unzipper {
+	u.Opts.Cleanup = cleanup
 	return u
 }
 
