@@ -172,6 +172,7 @@ func (c *CSVParser) Decode(input io.ReadCloser, abort chan struct{}) (chan inter
 				case <-abort:
 					return
 				case results <- rec:
+					c.reportProgress()
 					continue
 				}
 			}
@@ -312,6 +313,14 @@ func (c *CSVParser) parseRowWithFieldMap(row []string, fieldMap map[int][]int) (
 		}
 	}
 	return rec, nil
+}
+
+func (c *CSVParser) reportProgress() {
+	if c.Opts.Progress != nil {
+		go func() {
+			c.Opts.Progress <- struct{}{}
+		}()
+	}
 }
 
 // findFieldInStruct is used by parseHeader to locate the index of the selected field inside
