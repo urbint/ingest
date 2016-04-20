@@ -135,11 +135,11 @@ func (c *CSVParser) Start(ctrl *ingest.Controller) <-chan interface{} {
 //
 // If the Parser is configured to AbortOnError it will quit on a Parse error.
 func (c *CSVParser) Decode(input io.ReadCloser, abort chan struct{}) (chan interface{}, chan error) {
-	results := make(chan interface{})
+	done := make(chan interface{})
 	errs := make(chan error)
 
 	go func() {
-		defer func() { close(results) }()
+		defer func() { close(done) }()
 
 		reader := csv.NewReader(input)
 		defer input.Close()
@@ -171,7 +171,7 @@ func (c *CSVParser) Decode(input io.ReadCloser, abort chan struct{}) (chan inter
 				select {
 				case <-abort:
 					return
-				case results <- rec:
+				case c.Out <- rec:
 					c.reportProgress()
 					continue
 				}
@@ -179,7 +179,7 @@ func (c *CSVParser) Decode(input io.ReadCloser, abort chan struct{}) (chan inter
 		}
 	}()
 
-	return results, errs
+	return done, errs
 }
 
 func (c *CSVParser) startDecodeWorker(ctrl *ingest.Controller) {
@@ -199,11 +199,8 @@ func (c *CSVParser) startDecodeWorker(ctrl *ingest.Controller) {
 				done, errs := c.Decode(reader, ctrl.Quit)
 				for {
 					select {
-					case rec, ok := <-done:
-						if !ok {
-							continue WorkerAvailable
-						}
-						c.Out <- rec
+					case <-done:
+						continue WorkerAvailable
 					case err := <-errs:
 						if c.Opts.AbortOnError {
 							ctrl.Err <- err
