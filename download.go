@@ -36,8 +36,8 @@ type DownloadOpts struct {
 
 // DownloadProgress represents download progress
 type DownloadProgress struct {
-	File  string
-	Bytes int
+	FileName string
+	Bytes    int
 }
 
 // NewDownloader builds a new Downloader
@@ -103,9 +103,15 @@ func (d *Downloader) WithOpts(opts DownloadOpts) *Downloader {
 	return d
 }
 
+// ReportProgressTo is a chainable configuration method used to configure where Download Progress Reported To
+func (d *Downloader) ReportProgressTo(progress chan DownloadProgress) *Downloader {
+	d.Opts.Progress = progress
+	return d
+}
+
 // DownloadURL will download the specified URL into the configured temp directory. If the URL
 // is a file that exists on disk, the file will be read directly from the file system instead
-func (d *Downloader) DownloadURL(url string, abort chan bool) (*os.File, error) {
+func (d *Downloader) DownloadURL(url string, abort chan struct{}) (*os.File, error) {
 	log := d.Log.WithField("file", url)
 	log.Info("Opening...")
 
@@ -156,7 +162,7 @@ func (d *Downloader) DownloadURL(url string, abort chan bool) (*os.File, error) 
 func (d *Downloader) reportProgress(file string, bytes int64) {
 	if d.Opts.Progress != nil {
 		go func() {
-			d.Opts.Progress <- DownloadProgress{File: file, Bytes: int(bytes)}
+			d.Opts.Progress <- DownloadProgress{FileName: file, Bytes: int(bytes)}
 		}()
 	}
 }
@@ -172,7 +178,7 @@ func (d *Downloader) downloadQueue() <-chan string {
 }
 
 func (d *Downloader) startDownloadWorker(ctrl *Controller, queue <-chan string, results chan *os.File) {
-	d.Log.Debug("Starting download worker")
+	d.Log.Debug("Starting worker")
 	ctrl.WorkerStart()
 	go func() {
 		defer ctrl.WorkerEnd()

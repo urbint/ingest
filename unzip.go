@@ -22,8 +22,19 @@ type Unzipper struct {
 // at contruction or via the Chainable API
 type UnzipperOpts struct {
 	DownloadOpts
+	Progress          chan UnzipProgress
 	MaxParallelUnzips int `default:"1"`
 	Filter            string
+}
+
+// UnzipProgress represents Progress encountered while unzipping.
+type UnzipProgress struct {
+	// FileName is the name of the source zip file
+	FileName string
+
+	// ContentsCount is the number of files emitted from extracting the Zip.
+	// If a filter is set, the count reflects the number after the filter is applied.
+	ContentsCount int
 }
 
 // NewUnzipper builds a new Unzipper. Generally you will want to use the shortcut method `Unzip`
@@ -80,9 +91,23 @@ func (u *Unzipper) Cleanup(cleanup bool) *Unzipper {
 	return u
 }
 
+// ReportDownloadProgressTo is a chainable configuration method to set where download
+// progress is reported to.
+func (u *Unzipper) ReportDownloadProgressTo(progress chan DownloadProgress) *Unzipper {
+	u.Opts.DownloadOpts.Progress = progress
+	return u
+}
+
+// ReportProgressTo is a chainable configuration method to set where unzip
+// progress is reported to
+func (u *Unzipper) ReportProgressTo(progress chan UnzipProgress) *Unzipper {
+	u.Opts.Progress = progress
+	return u
+}
+
 func (u *Unzipper) startUnzipWorker(ctrl *Controller, input <-chan *os.File, output chan<- io.ReadCloser) {
 	ctrl.WorkerStart()
-	u.Log.Debug("Starting unzip worker")
+	u.Log.Debug("Starting worker")
 	go func() {
 		defer ctrl.WorkerEnd()
 		for {
@@ -139,6 +164,8 @@ func (u *Unzipper) UnzipFile(file *os.File) ([]io.ReadCloser, error) {
 		}
 	}
 
+	u.reportProgress(file.Name(), len(result))
+
 	return result, nil
 }
 
@@ -153,4 +180,13 @@ func (u *Unzipper) filterMatch(fileName string) bool {
 		return false
 	}
 	return res
+}
+
+// reportProgress will report unzip progress
+func (u *Unzipper) reportProgress(file string, contentCount int) {
+	if u.Opts.Progress != nil {
+		go func() {
+			u.Opts.Progress <- UnzipProgress{file, contentCount}
+		}()
+	}
 }

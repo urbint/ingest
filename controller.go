@@ -9,7 +9,7 @@ type Controller struct {
 	// Err is used by workers to report errors encountered while working
 	Err chan error
 	// Quit is closed by the controller when Abort is called
-	Quit chan bool
+	Quit chan struct{}
 
 	workerWg sync.WaitGroup
 	parent   *Controller
@@ -19,7 +19,7 @@ type Controller struct {
 func NewController() *Controller {
 	ctrl := &Controller{
 		Err:      make(chan error),
-		Quit:     make(chan bool),
+		Quit:     make(chan struct{}),
 		workerWg: sync.WaitGroup{},
 	}
 	return ctrl
