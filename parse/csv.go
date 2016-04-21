@@ -187,6 +187,7 @@ func (c *CSVParser) startDecodeWorker(ctrl *ingest.Controller) {
 	c.Log.Debug("Starting worker")
 	go func() {
 		defer ctrl.WorkerEnd()
+		defer c.Log.Debug("Exiting worker")
 	WorkerAvailable:
 		for {
 			select {
