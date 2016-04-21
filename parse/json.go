@@ -70,9 +70,9 @@ func (j *JSONParser) ReportProgressTo(dest chan struct{}) *JSONParser {
 	return j
 }
 
-// ReadInto sets the destination channel for the decoder
+// WriteTo sets the destination channel for the decoder
 // to unmarshal records into
-func (j *JSONParser) ReadInto(out chan interface{}) *JSONParser {
+func (j *JSONParser) WriteTo(out chan interface{}) *JSONParser {
 	j.output = out
 	j.ownOutput = false
 	return j

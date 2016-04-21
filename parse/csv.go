@@ -81,9 +81,9 @@ func (c *CSVParser) ReportProgressTo(dest chan struct{}) *CSVParser {
 	return c
 }
 
-// ReadInto sets the destination channel for the decoder
+// WriteTo sets the destination channel for the decoder
 // to unmarshal records into
-func (c *CSVParser) ReadInto(out chan interface{}) *CSVParser {
+func (c *CSVParser) WriteTo(out chan interface{}) *CSVParser {
 	c.Out = out
 	c.ownOutput = false
 	return c
