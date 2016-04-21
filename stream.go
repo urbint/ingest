@@ -9,6 +9,8 @@ type Streamer struct {
 	Log  Logger
 	In   <-chan interface{}
 	Out  chan interface{}
+
+	depGroup *DependencyGroup
 }
 
 // StreamOpts are the options used to configure a Streamer
@@ -19,8 +21,9 @@ type StreamOpts struct {
 // Stream builds a new Streamer that will read from the input channel
 func Stream(input <-chan interface{}) *Streamer {
 	return &Streamer{
-		Log: DefaultLogger.WithField("task", "stream"),
-		In:  input,
+		Log:      DefaultLogger.WithField("task", "stream"),
+		In:       input,
+		depGroup: NewDependencyGroup(),
 	}
 }
 
@@ -58,10 +61,19 @@ func (s *Streamer) ReportProgressTo(progress chan struct{}) *Streamer {
 	return s
 }
 
+// DependOn is a chainable configuration method that will not proceed until all
+// specified controllers have resolved
+func (s *Streamer) DependOn(ctrls ...*Controller) *Streamer {
+	s.depGroup.SetCtrls(ctrls...)
+	return s
+}
+
 // Start starts running the Stream task under the control of the specified controller
 func (s *Streamer) Start(ctrl *Controller) <-chan interface{} {
 	ctrl = ctrl.Child()
 	defer ctrl.ChildBuilt()
+
+	s.depGroup.Wait()
 
 	out := s.Out
 	if out == nil {

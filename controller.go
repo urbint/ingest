@@ -11,53 +11,65 @@ type Controller struct {
 	// Quit is closed by the controller when Abort is called
 	Quit chan struct{}
 
-	workerWg sync.WaitGroup
-	parent   *Controller
+	wg         sync.WaitGroup
+	parent     *Controller
+	childBuilt bool
+	mu         sync.Mutex
 }
 
 // NewController builds a new Controller for use
 func NewController() *Controller {
 	ctrl := &Controller{
-		Err:      make(chan error),
-		Quit:     make(chan struct{}),
-		workerWg: sync.WaitGroup{},
+		Err:  make(chan error),
+		Quit: make(chan struct{}),
+		wg:   sync.WaitGroup{},
+		mu:   sync.Mutex{},
 	}
 	return ctrl
 }
 
 // ChildBuilt is called on a child Controller to denote that it has been built and its wait group is valid
 func (c *Controller) ChildBuilt() *Controller {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if c.parent == nil {
 		panic("ChildBuilt called on a non-child Controller")
 	}
-	c.workerWg.Done()
+
+	if c.childBuilt {
+		return c
+	}
+
+	c.childBuilt = true
+	c.wg.Done()
 	return c
 }
 
 // WorkerStart is called by Worker to indicate to the controller
 // that it is running and that the job is not complete until it exits
 func (c *Controller) WorkerStart() *Controller {
-	c.workerWg.Add(1)
+	c.wg.Add(1)
 	return c
 }
 
 // WorkerEnd is called by a Worker to signal that is has finished
 // running
 func (c *Controller) WorkerEnd() *Controller {
-	c.workerWg.Done()
+	c.wg.Done()
 	return c
 }
 
 // Wait waits for all workers to have exited
 func (c *Controller) Wait() {
-	c.workerWg.Wait()
+	c.wg.Wait()
 }
 
 // Done returns a channel that will be closed when the worker controller has finished
 func (c *Controller) Done() chan struct{} {
 	done := make(chan struct{})
 	go func() {
-		c.workerWg.Wait()
+		c.wg.Wait()
 		close(done)
 	}()
 	return done
@@ -108,7 +120,7 @@ func (c *Controller) ReportEndTo(end chan struct{}) *Controller {
 func (c *Controller) Child() *Controller {
 	child := NewController()
 	child.parent = c
-	child.workerWg.Add(1) // use this to prevent child.Wait from returning immediately. ChildBuilt must be called
+	child.wg.Add(1) // use this to prevent child.Wait from returning immediately. ChildBuilt must be called
 	c.WorkerStart()
 
 	go func() {
@@ -126,4 +138,45 @@ func (c *Controller) Child() *Controller {
 		}
 	}()
 	return child
+}
+
+// A DependencyGroup is used to define a wait group that will wait on
+// all of the specified controllers to resolve.
+//
+// Calling Wait on the depenecy group will automatically denote the controller
+// as built (if it is a child).
+type DependencyGroup struct {
+	ctrls []*Controller
+}
+
+// NewDependencyGroup builds a DependencyGroup with the specified controllers
+func NewDependencyGroup(ctrls ...*Controller) *DependencyGroup {
+	return &DependencyGroup{
+		ctrls: ctrls,
+	}
+}
+
+// SetCtrls sets the controllers for the DependencyGroup
+func (d *DependencyGroup) SetCtrls(ctrls ...*Controller) {
+	d.ctrls = ctrls
+}
+
+// Wait will automatically call child built on all specified controllers
+// and return when all of the controllers have resolved
+func (d *DependencyGroup) Wait() {
+	if len(d.ctrls) == 0 {
+		return
+	}
+	wg := sync.WaitGroup{}
+	wg.Add(len(d.ctrls))
+	for _, ctrl := range d.ctrls {
+		go func(ctrl *Controller) {
+			if ctrl.parent {
+				ctrl.ChildBuilt()
+			}
+			ctrl.Wait()
+			wg.Done()
+		}(ctrl)
+	}
+	wg.Wait()
 }

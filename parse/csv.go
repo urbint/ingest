@@ -31,6 +31,8 @@ type CSVParser struct {
 	In     <-chan io.ReadCloser
 	Out    chan interface{}
 	newRec func() interface{}
+
+	depGroup *ingest.DependencyGroup
 }
 
 // CSVParserOpts are used to configure a CSVParser
@@ -45,7 +47,8 @@ type CSVParserOpts struct {
 // NewCSVParser builds a CSVParser. Usually, parse.CSV is preferred
 func NewCSVParser() *CSVParser {
 	parser := &CSVParser{
-		Log: ingest.DefaultLogger.WithField("task", "parse-csv"),
+		Log:      ingest.DefaultLogger.WithField("task", "parse-csv"),
+		depGroup: ingest.NewDependencyGroup(),
 	}
 
 	defaults.SetDefaults(&parser.Opts)
@@ -77,6 +80,13 @@ func (c *CSVParser) TrimSpaces(trim bool) *CSVParser {
 // progress will be reported to
 func (c *CSVParser) ReportProgressTo(dest chan struct{}) *CSVParser {
 	c.Opts.Progress = dest
+	return c
+}
+
+// DependOn is a chainable configuration method that will not proceed until all
+// specified controllers have resolved
+func (c *CSVParser) DependOn(ctrls ...*Controller) *CSVParser {
+	c.depGroup.SetCtrls(ctrls...)
 	return c
 }
 
@@ -113,6 +123,8 @@ func (c *CSVParser) Start(ctrl *ingest.Controller) chan interface{} {
 
 	childCtrl := ctrl.Child()
 	defer childCtrl.ChildBuilt()
+
+	c.depGroup.Wait()
 
 	if c.Out == nil {
 		c.Out = make(chan interface{})

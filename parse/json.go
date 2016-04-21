@@ -17,7 +17,8 @@ type JSONParser struct {
 	In  <-chan io.ReadCloser
 	Out chan interface{}
 
-	newRec func() interface{}
+	newRec   func() interface{}
+	depGroup *ingest.DependencyGroup
 }
 
 // JSONParseOpts is used to configure a JSONParser
@@ -31,7 +32,8 @@ type JSONParseOpts struct {
 // NewJSONParser builds a JSONParser. You will usually want to use parse.JSON instead
 func NewJSONParser() *JSONParser {
 	parser := &JSONParser{
-		Log: ingest.DefaultLogger.WithField("task", "parse-json"),
+		Log:      ingest.DefaultLogger.WithField("task", "parse-json"),
+		depGroup: ingest.NewDependencyGroup(),
 	}
 
 	defaults.SetDefaults(&parser.Opts)
@@ -66,6 +68,13 @@ func (j *JSONParser) ReportProgressTo(dest chan struct{}) *JSONParser {
 	return j
 }
 
+// DependOn is a chainable configuration method that will not proceed until all
+// specified controllers have resolved
+func (j *JSONParser) DependOn(ctrls ...*Controller) *JSONParser {
+	j.depGroup.SetCtrls(ctrls...)
+	return j
+}
+
 // WriteTo sets the destination channel for the decoder
 // to unmarshal records into
 func (j *JSONParser) WriteTo(out chan interface{}) *JSONParser {
@@ -97,6 +106,8 @@ func (j *JSONParser) Start(ctrl *ingest.Controller) <-chan interface{} {
 
 	childCtrl := ctrl.Child()
 	defer childCtrl.ChildBuilt()
+
+	j.depGroup.Wait()
 
 	// If we don't have an output channel, make one and close it after we read all the records
 	if j.Out == nil {

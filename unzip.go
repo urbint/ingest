@@ -15,7 +15,8 @@ type Unzipper struct {
 	Log      Logger
 	Opts     UnzipperOpts
 
-	ctrl *Controller
+	depGroup *DependencyGroup
+	ctrl     *Controller
 }
 
 // UnzipperOpts are options used to configure an Unzipper. They can be specified
@@ -40,7 +41,8 @@ type UnzipProgress struct {
 // NewUnzipper builds a new Unzipper. Generally you will want to use the shortcut method `Unzip`
 func NewUnzipper() *Unzipper {
 	unzipper := &Unzipper{
-		Log: DefaultLogger.WithField("task", "unzip"),
+		Log:      DefaultLogger.WithField("task", "unzip"),
+		depGroup: NewDependencyGroup(),
 	}
 
 	defaults.SetDefaults(&unzipper.Opts)
@@ -59,6 +61,8 @@ func Unzip(urls ...string) *Unzipper {
 func (u *Unzipper) Start(ctrl *Controller) <-chan io.ReadCloser {
 	ctrl = ctrl.Child()
 	defer ctrl.ChildBuilt()
+
+	u.depGroup.Wait()
 
 	unzipped := make(chan io.ReadCloser)
 	go func() {
@@ -102,6 +106,13 @@ func (u *Unzipper) ReportDownloadProgressTo(progress chan DownloadProgress) *Unz
 // progress is reported to
 func (u *Unzipper) ReportProgressTo(progress chan UnzipProgress) *Unzipper {
 	u.Opts.Progress = progress
+	return u
+}
+
+// DependOn is a chainable configuration method that will not proceed until all
+// specified controllers have resolved
+func (u *Unzipper) DependOn(ctrls ...*Controller) *Unzipper {
+	u.depGroup.SetCtrls(ctrls...)
 	return u
 }
 

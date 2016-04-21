@@ -17,6 +17,8 @@ type Downloader struct {
 	Log      Logger
 	URLs     []string
 	URLCount int
+
+	depGroup *DependencyGroup
 }
 
 // DownloadOpts are options used to configure a Downloader. They can be specified at contruction or via the Chainable API
@@ -43,7 +45,8 @@ type DownloadProgress struct {
 // NewDownloader builds a new Downloader
 func NewDownloader() *Downloader {
 	dl := &Downloader{
-		Log: DefaultLogger.WithField("task", "download"),
+		Log:      DefaultLogger.WithField("task", "download"),
+		depGroup: NewDependencyGroup(),
 	}
 	defaults.SetDefaults(&dl.Opts)
 	return dl
@@ -64,6 +67,8 @@ func (d *Downloader) Start(ctrl *Controller) <-chan *os.File {
 
 	childCtrl := ctrl.Child()
 	defer childCtrl.ChildBuilt()
+
+	d.depGroup.Wait()
 
 	go func() {
 		ctrl.Wait()
@@ -107,6 +112,13 @@ func (d *Downloader) WithOpts(opts DownloadOpts) *Downloader {
 // ReportProgressTo is a chainable configuration method used to configure where Download Progress Reported To
 func (d *Downloader) ReportProgressTo(progress chan DownloadProgress) *Downloader {
 	d.Opts.Progress = progress
+	return d
+}
+
+// DependOn is a chainable configuration method that will not proceed until all
+// specified controllers have resolved
+func (d *Downloader) DependOn(ctrls ...*Controller) *Downloader {
+	d.depGroup.SetCtrls(ctrls...)
 	return d
 }
 
