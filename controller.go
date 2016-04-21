@@ -81,6 +81,24 @@ func (c *Controller) Abort() {
 	c.Wait()
 }
 
+// ReportStartTo is syntactical sugar around sending an empty struct to a channel
+// in a chainable API
+func (c *Controller) ReportStartTo(start chan struct{}) *Controller {
+	go func() {
+		start <- struct{}{}
+	}()
+	return c
+}
+
+// ReportEndTo will send an event when the Controller finishes
+func (c *Controller) ReportEndTo(end chan struct{}) *Controller {
+	go func() {
+		c.Wait()
+		end <- struct{}{}
+	}()
+	return c
+}
+
 // Child creates a new child controller that will quit when the parent quits
 // and report errors back to the parent.
 //
