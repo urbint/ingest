@@ -14,10 +14,8 @@ type JSONParser struct {
 	Opts JSONParseOpts
 	Log  ingest.Logger
 
-	input <-chan io.ReadCloser
-
-	output    chan interface{}
-	ownOutput bool
+	In  <-chan io.ReadCloser
+	Out chan interface{}
 
 	newRec func() interface{}
 }
@@ -33,9 +31,7 @@ type JSONParseOpts struct {
 // NewJSONParser builds a JSONParser. You will usually want to use parse.JSON instead
 func NewJSONParser() *JSONParser {
 	parser := &JSONParser{
-		Log:       ingest.DefaultLogger.WithField("task", "parse-json"),
-		ownOutput: true,
-		output:    make(chan interface{}),
+		Log: ingest.DefaultLogger.WithField("task", "parse-json"),
 	}
 
 	defaults.SetDefaults(&parser.Opts)
@@ -45,7 +41,7 @@ func NewJSONParser() *JSONParser {
 // JSON builds a JSONParser which will read from the specified input channel
 func JSON(input <-chan io.ReadCloser) *JSONParser {
 	parser := NewJSONParser()
-	parser.input = input
+	parser.In = input
 
 	return parser
 }
@@ -73,8 +69,7 @@ func (j *JSONParser) ReportProgressTo(dest chan struct{}) *JSONParser {
 // WriteTo sets the destination channel for the decoder
 // to unmarshal records into
 func (j *JSONParser) WriteTo(out chan interface{}) *JSONParser {
-	j.output = out
-	j.ownOutput = false
+	j.Out = out
 	return j
 }
 
@@ -96,11 +91,12 @@ func (j *JSONParser) Start(ctrl *ingest.Controller) <-chan interface{} {
 	childCtrl := ctrl.Child()
 	defer childCtrl.ChildBuilt()
 
-	// If we own the output channel, close it after all of our workers have exited
-	if j.ownOutput {
+	// If we don't have an output channel, make one and close it after we read all the records
+	if j.Out == nil {
+		j.Out = make(chan interface{})
 		go func() {
 			childCtrl.Wait()
-			close(j.output)
+			close(j.Out)
 		}()
 	}
 
@@ -108,7 +104,7 @@ func (j *JSONParser) Start(ctrl *ingest.Controller) <-chan interface{} {
 		j.startDecodeWorker(childCtrl)
 	}
 
-	return j.output
+	return j.Out
 }
 
 func (j *JSONParser) startDecodeWorker(ctrl *ingest.Controller) {
@@ -122,7 +118,7 @@ func (j *JSONParser) startDecodeWorker(ctrl *ingest.Controller) {
 			select {
 			case <-ctrl.Quit:
 				return
-			case reader, ok := <-j.input:
+			case reader, ok := <-j.In:
 				if !ok {
 					return
 				}
@@ -183,7 +179,7 @@ func (j *JSONParser) Decode(reader io.Reader, abort chan struct{}) (done chan st
 				select {
 				case <-abort:
 					return
-				case j.output <- rec:
+				case j.Out <- rec:
 					j.reportProgress()
 					continue
 				}

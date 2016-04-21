@@ -28,10 +28,9 @@ type CSVParser struct {
 	Opts CSVParserOpts
 	Log  ingest.Logger
 
-	In        <-chan io.ReadCloser
-	Out       chan interface{}
-	ownOutput bool
-	newRec    func() interface{}
+	In     <-chan io.ReadCloser
+	Out    chan interface{}
+	newRec func() interface{}
 }
 
 // CSVParserOpts are used to configure a CSVParser
@@ -85,7 +84,6 @@ func (c *CSVParser) ReportProgressTo(dest chan struct{}) *CSVParser {
 // to unmarshal records into
 func (c *CSVParser) WriteTo(out chan interface{}) *CSVParser {
 	c.Out = out
-	c.ownOutput = false
 	return c
 }
 
@@ -116,10 +114,10 @@ func (c *CSVParser) Start(ctrl *ingest.Controller) <-chan interface{} {
 	childCtrl := ctrl.Child()
 	defer childCtrl.ChildBuilt()
 
-	// If we own the output channel, close it after all of our workers have exited
-	if c.ownOutput {
-		go func() {
-			childCtrl.Wait()
+	if c.Out == nil {
+		c.Out = make(chan interface{})
+		defer func() {
+			ctrl.Wait()
 			close(c.Out)
 		}()
 	}
