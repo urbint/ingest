@@ -148,8 +148,10 @@ func (d *Downloader) DownloadURL(url string, abort chan struct{}) (*os.File, err
 		case <-abort:
 			return nil, ErrAborted
 		default:
-			if coppied, err := io.CopyN(destFile, reader, DownloadCopyBlockBytes); err != nil {
-				d.reportProgress(outName, coppied)
+			coppied, err := io.CopyN(destFile, reader, DownloadCopyBlockBytes)
+			d.reportProgress(outName, coppied)
+
+			if err != nil {
 				if err == io.EOF {
 					return destFile, nil
 				}
