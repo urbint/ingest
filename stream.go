@@ -1,5 +1,8 @@
 package ingest
 
+import "fmt"
+import "reflect"
+
 // A Streamer is used to manipulate input in and out of channels and slices
 type Streamer struct {
 	Opts StreamOpts
@@ -17,6 +20,26 @@ type StreamOpts struct {
 func Stream(input <-chan interface{}) *Streamer {
 	return &Streamer{
 		Log: DefaultLogger.WithField("task", "stream"),
+		In:  input,
+	}
+}
+
+// StreamArray builds a Streamer which will ready from the provided array
+func StreamArray(array interface{}) *Streamer {
+	arrValue := reflect.ValueOf(array)
+
+	if arrValue.Kind() != reflect.Slice && arrValue.Kind() != reflect.Array {
+		panic(fmt.Sprintf("ingest.StreamArray called on non-array type: %s", arrValue.Type().String()))
+	}
+
+	size := arrValue.Len()
+	input := make(chan interface{}, size)
+	for i := 0; i < size; i++ {
+		input <- arrValue.Index(i).Interface()
+	}
+
+	return &Streamer{
+		Log: DefaultLogger.WithField("task", "stream-array"),
 		In:  input,
 	}
 }
@@ -74,6 +97,36 @@ func (s *Streamer) Start(ctrl *Controller) <-chan interface{} {
 	}()
 
 	return out
+}
+
+// Collect reads the results of the Input into an array, under the control of the specified controller.
+//
+// If the Controller is aborted, ErrAborted will be returned
+// The result is untyped as an interface allowing for direct type conversion
+func (s *Streamer) Collect(ctrl *Controller) (interface{}, error) {
+	resultChan := s.Start(ctrl)
+
+	results := []interface{}{}
+
+	for {
+		select {
+		case rec, ok := <-resultChan:
+			if !ok {
+				return results, nil
+			}
+			results = append(results, rec)
+		case err := <-ctrl.Err:
+			return nil, err
+		case <-ctrl.Quit:
+			return nil, ErrAborted
+		}
+	}
+}
+
+// ForEach runs the specified function on each record in the channel
+// If an error is returned, it will be reported to the controller
+func (s *Streamer) ForEach(func(interface{}) error) *Streamer {
+	panic("Not implemented")
 }
 
 // reportProgress will emit a progress event if there is a configured listener

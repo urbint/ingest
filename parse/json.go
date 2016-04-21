@@ -82,6 +82,13 @@ func (j *JSONParser) Struct(rec interface{}) *JSONParser {
 	return j
 }
 
+// Collect runs the parser syncronously and returns the results as an array, or any error encountered
+//
+// The result is untyped as an interface allowing for direct type conversion
+func (j *JSONParser) Collect(ctrl *ingest.Controller) (interface{}, error) {
+	return ingest.Stream(j.Start(ctrl)).Collect(ctrl)
+}
+
 // Start starts running the parser under the control of the specified controller
 func (j *JSONParser) Start(ctrl *ingest.Controller) <-chan interface{} {
 	if j.newRec == nil {
