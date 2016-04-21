@@ -43,7 +43,7 @@ func (s *Streamer) Start(ctrl *Controller) <-chan interface{} {
 	out := s.Out
 	if out == nil {
 		out = make(chan interface{})
-		defer func() {
+		go func() {
 			ctrl.Wait()
 			close(out)
 		}()

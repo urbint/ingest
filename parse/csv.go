@@ -106,7 +106,7 @@ func (c *CSVParser) Struct(rec interface{}) *CSVParser {
 }
 
 // Start starts running the parser under the control of the specified controller
-func (c *CSVParser) Start(ctrl *ingest.Controller) <-chan interface{} {
+func (c *CSVParser) Start(ctrl *ingest.Controller) chan interface{} {
 	if c.newRec == nil {
 		panic("No known instantiating function. Configure the parser using .Struct")
 	}
@@ -116,8 +116,8 @@ func (c *CSVParser) Start(ctrl *ingest.Controller) <-chan interface{} {
 
 	if c.Out == nil {
 		c.Out = make(chan interface{})
-		defer func() {
-			ctrl.Wait()
+		go func() {
+			childCtrl.Wait()
 			close(c.Out)
 		}()
 	}
