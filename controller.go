@@ -25,12 +25,13 @@ func NewController() *Controller {
 	return ctrl
 }
 
-// ChildBuilt is callled on a child Controller to denote that it has been built and its wait group is valid
-func (c *Controller) ChildBuilt() {
+// ChildBuilt is called on a child Controller to denote that it has been built and its wait group is valid
+func (c *Controller) ChildBuilt() *Controller {
 	if c.parent == nil {
 		panic("ChildBuilt called on a non-child Controller")
 	}
 	c.workerWg.Done()
+	return c
 }
 
 // WorkerStart is called by Worker to indicate to the controller
