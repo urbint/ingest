@@ -114,8 +114,7 @@ func (s *Streamer) Start(ctrl *Controller) <-chan interface{} {
 // Collect reads the results of the Input into an array, under the control of the specified controller.
 //
 // If the Controller is aborted, ErrAborted will be returned
-// The result is untyped as an interface allowing for direct type conversion
-func (s *Streamer) Collect(ctrl *Controller) (interface{}, error) {
+func (s *Streamer) Collect(ctrl *Controller) ([]interface{}, error) {
 	resultChan := s.Start(ctrl)
 
 	results := []interface{}{}
