@@ -164,7 +164,7 @@ func (d *DependencyGroup) SetCtrls(ctrls ...*Controller) {
 // Wait will automatically call child built on all specified controllers
 // and return when all of the controllers have resolved
 func (d *DependencyGroup) Wait() {
-	if len(d.ctrls) == 0 {
+	if d.ctrls == nil {
 		return
 	}
 	wg := sync.WaitGroup{}
