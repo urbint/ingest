@@ -3,6 +3,9 @@ package ingest
 import "fmt"
 import "reflect"
 
+// StreamForEachFn is a function that operates over each record in a stream
+type StreamForEachFn func(rec interface{}) error
+
 // A Streamer is used to manipulate input in and out of channels and slices
 type Streamer struct {
 	Opts StreamOpts
@@ -11,6 +14,7 @@ type Streamer struct {
 	Out  chan interface{}
 
 	depGroup *DependencyGroup
+	forEachs []StreamForEachFn
 }
 
 // StreamOpts are the options used to configure a Streamer
@@ -18,13 +22,20 @@ type StreamOpts struct {
 	Progress chan struct{}
 }
 
-// Stream builds a new Streamer that will read from the input channel
-func Stream(input <-chan interface{}) *Streamer {
+// NewStream builds a new Streamer. Generally you will want to use
+// StreamArray or Stream instead
+func NewStream() *Streamer {
 	return &Streamer{
-		Log:      DefaultLogger.WithField("task", "stream"),
-		In:       input,
 		depGroup: NewDependencyGroup(),
 	}
+}
+
+// Stream builds a new Streamer that will read from the input channel
+func Stream(input <-chan interface{}) *Streamer {
+	stream := NewStream()
+	stream.Log = DefaultLogger.WithField("task", "stream")
+	stream.In = input
+	return stream
 }
 
 // StreamArray builds a Streamer which will ready from the provided array
@@ -41,10 +52,11 @@ func StreamArray(array interface{}) *Streamer {
 		input <- arrValue.Index(i).Interface()
 	}
 
-	return &Streamer{
-		Log: DefaultLogger.WithField("task", "stream-array"),
-		In:  input,
-	}
+	stream := NewStream()
+	stream.Log = DefaultLogger.WithField("task", "stream-array")
+	stream.In = input
+
+	return stream
 }
 
 // WriteTo is a chainable configuration method that sets
@@ -65,6 +77,19 @@ func (s *Streamer) ReportProgressTo(progress chan struct{}) *Streamer {
 // specified controllers have resolved
 func (s *Streamer) DependOn(ctrls ...*Controller) *Streamer {
 	s.depGroup.SetCtrls(ctrls...)
+	return s
+}
+
+// ForEach is a chainable configuration method that will
+// execute a function on the specified stream.
+//
+// If an error is returned, it will be reported to the controller
+// and the record will not be transmitted
+//
+// For each can be called multiple times, in which case the functions will
+// be executed in the order that they were added to the stream
+func (s *Streamer) ForEach(fn StreamForEachFn) *Streamer {
+	s.forEachs = append(s.forEachs, fn)
 	return s
 }
 
@@ -96,6 +121,10 @@ func (s *Streamer) Start(ctrl *Controller) <-chan interface{} {
 			case rec, ok := <-s.In:
 				if !ok {
 					return
+				}
+				if err := s.runForEachs(rec); err != nil {
+					ctrl.Err <- err
+					continue
 				}
 				select {
 				case <-ctrl.Quit:
@@ -134,12 +163,6 @@ func (s *Streamer) Collect(ctrl *Controller) ([]interface{}, error) {
 	}
 }
 
-// ForEach runs the specified function on each record in the channel
-// If an error is returned, it will be reported to the controller
-func (s *Streamer) ForEach(func(interface{}) error) *Streamer {
-	panic("Not implemented")
-}
-
 // reportProgress will emit a progress event if there is a configured listener
 func (s *Streamer) reportProgress() {
 	if s.Opts.Progress != nil {
@@ -147,4 +170,22 @@ func (s *Streamer) reportProgress() {
 			s.Opts.Progress <- struct{}{}
 		}()
 	}
+}
+
+// runForEachs will run all of the forEach functions on the specified record, or
+// return the first error encountered.
+//
+// If there are no forEachs, it is essentially a no-op
+func (s *Streamer) runForEachs(rec interface{}) error {
+	if s.forEachs == nil || len(s.forEachs) == 0 {
+		return nil
+	}
+
+	for _, fn := range s.forEachs {
+		if err := fn(rec); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
