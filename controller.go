@@ -171,7 +171,7 @@ func (d *DependencyGroup) Wait() {
 	wg.Add(len(d.ctrls))
 	for _, ctrl := range d.ctrls {
 		go func(ctrl *Controller) {
-			if ctrl.parent {
+			if ctrl.parent != nil {
 				ctrl.ChildBuilt()
 			}
 			ctrl.Wait()

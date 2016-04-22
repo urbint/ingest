@@ -70,7 +70,7 @@ func (j *JSONParser) ReportProgressTo(dest chan struct{}) *JSONParser {
 
 // DependOn is a chainable configuration method that will not proceed until all
 // specified controllers have resolved
-func (j *JSONParser) DependOn(ctrls ...*Controller) *JSONParser {
+func (j *JSONParser) DependOn(ctrls ...*ingest.Controller) *JSONParser {
 	j.depGroup.SetCtrls(ctrls...)
 	return j
 }

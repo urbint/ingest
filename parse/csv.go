@@ -85,7 +85,7 @@ func (c *CSVParser) ReportProgressTo(dest chan struct{}) *CSVParser {
 
 // DependOn is a chainable configuration method that will not proceed until all
 // specified controllers have resolved
-func (c *CSVParser) DependOn(ctrls ...*Controller) *CSVParser {
+func (c *CSVParser) DependOn(ctrls ...*ingest.Controller) *CSVParser {
 	c.depGroup.SetCtrls(ctrls...)
 	return c
 }
