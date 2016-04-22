@@ -51,6 +51,7 @@ func StreamArray(array interface{}) *Streamer {
 	for i := 0; i < size; i++ {
 		input <- arrValue.Index(i).Interface()
 	}
+	close(input)
 
 	stream := NewStream()
 	stream.Log = DefaultLogger.WithField("task", "stream-array")
