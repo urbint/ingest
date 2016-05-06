@@ -17,7 +17,6 @@ var DefaultLogger Logger = &EmptyLogger{}
 type Logger interface {
 	WithError(err error) Logger
 	WithField(field string, value interface{}) Logger
-	WithFields(map[string]interface{}) Logger
 	Debug(args ...interface{})
 	Info(args ...interface{})
 	Warn(args ...interface{})
@@ -32,9 +31,6 @@ func (e *EmptyLogger) WithError(err error) Logger { return e }
 
 // WithField placeholder
 func (e *EmptyLogger) WithField(field string, value interface{}) Logger { return e }
-
-// WithFields placeholder
-func (e *EmptyLogger) WithFields(fields map[string]interface{}) Logger { return e }
 
 // Debug placeholder
 func (e *EmptyLogger) Debug(args ...interface{}) {}

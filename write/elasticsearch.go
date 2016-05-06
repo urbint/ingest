@@ -133,10 +133,7 @@ func (e *ElasticWriter) afterFlush(id int64, requests []elastic.BulkableRequest,
 	if response.Errors {
 		for _, item := range response.Failed() {
 			esErr := item.Error
-			e.Log.WithFields(map[string]interface{}{
-				"reason": esErr.Reason,
-				"type":   esErr.Type,
-			}).Error("Error in bulk insert")
+			e.Log.WithField("reason", esErr.Reason).WithField("type", esErr.Type).Error("Error in bulk insert")
 		}
 	}
 	if err != nil {
