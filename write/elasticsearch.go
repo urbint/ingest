@@ -73,6 +73,7 @@ func (e *ElasticWriter) Start(ctrl *ingest.Controller) {
 		ctrl.Err <- err
 		return
 	}
+	defer e.stopBulkProcessor()
 
 	for {
 		select {
