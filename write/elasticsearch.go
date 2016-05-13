@@ -42,7 +42,7 @@ type ElasticWritable interface {
 }
 
 // ForElastic converts a chan of interface to a chan of ElasticWritable
-func ForElastic(in chan interface{}) chan ElasticWritable {
+func ForElastic(in <-chan interface{}) chan ElasticWritable {
 	result := make(chan ElasticWritable)
 	go func() {
 		for rec := range in {
