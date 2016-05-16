@@ -67,6 +67,13 @@ func Elasticsearch(client *elastic.Client, input <-chan ElasticWritable) *Elasti
 	return writer
 }
 
+// ReportProgressTo is a chainable configuration method that sets where
+// progress will be reported to
+func (e *ElasticWriter) ReportProgressTo(dest chan struct{}) *ElasticWriter {
+	e.Opts.Progress = dest
+	return e
+}
+
 // Start starts the ElasticWriter under the control of the *ingest.Controller
 func (e *ElasticWriter) Start(ctrl *ingest.Controller) {
 	if err := e.startBulkProcessor(); err != nil {
