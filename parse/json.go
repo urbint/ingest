@@ -48,6 +48,18 @@ func JSON(input <-chan io.ReadCloser) *JSONParser {
 	return parser
 }
 
+// JSONReader reads a single io.ReadCloser
+func JSONReader(input io.ReadCloser) *JSONParser {
+	parser := NewJSONParser()
+	in := make(chan io.ReadCloser, 1)
+	in <- input
+	close(in)
+
+	parser.In = in
+
+	return parser
+}
+
 // Select sets the Selection that will be used to parse the specified JSON
 func (j *JSONParser) Select(selection string) *JSONParser {
 	j.Opts.Selection = selection
