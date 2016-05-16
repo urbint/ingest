@@ -1,6 +1,7 @@
 package write
 
 import (
+	"runtime"
 	"sync/atomic"
 	"time"
 
@@ -11,9 +12,10 @@ import (
 
 // ElasticWriterOpts are used to configure an ElasticWriter
 type ElasticWriterOpts struct {
-	NumWorkers        int           `default:"1"`
-	MaxPendingActions int           `default:"3000"`
-	FlushInterval     time.Duration `default:"3s"`
+	NumWorkers        int           // defaults to runtime.NumCPU()
+	MaxPendingActions int           `default:"-1"`
+	FlushInterval     time.Duration `default:"5m"`
+	FlushSize         int           `default:"15000000"`
 	AbortOnError      bool          `default:"false"`
 	Progress          chan struct{}
 }
@@ -64,6 +66,8 @@ func Elasticsearch(client *elastic.Client, input <-chan ElasticWritable) *Elasti
 
 	defaults.SetDefaults(&writer.Opts)
 
+	writer.Opts.NumWorkers = runtime.NumCPU()
+
 	return writer
 }
 
@@ -71,6 +75,41 @@ func Elasticsearch(client *elastic.Client, input <-chan ElasticWritable) *Elasti
 // progress will be reported to
 func (e *ElasticWriter) ReportProgressTo(dest chan struct{}) *ElasticWriter {
 	e.Opts.Progress = dest
+	return e
+}
+
+// NumWorkers is a chainable configuration method that sets how
+// many workers are used to write to elasticsearch
+func (e *ElasticWriter) NumWorkers(count int) *ElasticWriter {
+	e.Opts.NumWorkers = count
+	return e
+}
+
+// MaxPending is a chainable configuration method that sets how
+// many queued operations the bulk-processor will allow before sending a request
+//
+// Setting it to -1 will disable flushing based off max pending ops
+func (e *ElasticWriter) MaxPending(count int) *ElasticWriter {
+	e.Opts.MaxPendingActions = count
+	return e
+}
+
+// FlushEvery is a chainable configuration method that sets the interval which
+// will force a Flush of the queued bulk-processor operations
+//
+// Setting it to -1 will disable flushing based off an interval
+func (e *ElasticWriter) FlushEvery(interval time.Duration) *ElasticWriter {
+	e.Opts.FlushInterval = interval
+	return e
+}
+
+// FlushSize is a chainable configuration method that sets the max
+// size of queued record operations that will trigger a flush of
+// the bulk-processor
+//
+// Setting it to -1 will disable flushing based off max record size
+func (e *ElasticWriter) FlushSize(numBytes int) *ElasticWriter {
+	e.Opts.FlushSize = numBytes
 	return e
 }
 
@@ -106,6 +145,7 @@ func (e *ElasticWriter) startBulkProcessor() error {
 	proc, err := e.es.BulkProcessor().
 		Workers(e.Opts.NumWorkers).
 		BulkActions(e.Opts.MaxPendingActions).
+		BulkSize(e.Opts.FlushSize).
 		FlushInterval(e.Opts.FlushInterval).
 		After(e.afterFlush).
 		Do()
