@@ -8,6 +8,7 @@ import (
 	"github.com/mcuadros/go-defaults"
 	"github.com/olivere/elastic"
 	"github.com/urbint/ingest"
+	"github.com/urbint/ingest/utils"
 )
 
 // ElasticWriterOpts are used to configure an ElasticWriter
@@ -111,6 +112,47 @@ func (e *ElasticWriter) FlushEvery(interval time.Duration) *ElasticWriter {
 func (e *ElasticWriter) FlushSize(numBytes int) *ElasticWriter {
 	e.Opts.FlushSize = numBytes
 	return e
+}
+
+// ApplySettings reads the configured SettingsPath and applies the settings file to
+// elasticsearch cluster.
+func (e *ElasticWriter) ApplySettings(indexName string, settingsPath string) error {
+	settings, err := utils.ReadConfig(settingsPath)
+	if err != nil {
+		return err
+	}
+
+	_, err = e.es.IndexPutSettings(indexName).BodyJson(settings).Do()
+
+	return err
+}
+
+// CreateIndexWithSettings creates an index with the specified name and settings. If the index already
+// exists and recreate is true, it will delete the index before creating it
+func (e *ElasticWriter) CreateIndexWithSettings(indexName string, settingsPath string, recreate bool) error {
+	exists, err := e.es.IndexExists(indexName).Do()
+	if !exists && err != nil {
+		return err
+	}
+
+	settings, err := utils.ReadConfig(settingsPath)
+	if err != nil {
+		return err
+	}
+
+	if exists && !recreate {
+		return nil
+	}
+
+	if recreate {
+		if _, err = e.es.DeleteIndex(indexName).Do(); err != nil {
+			return err
+		}
+	}
+
+	_, err = e.es.CreateIndex(indexName).BodyJson(settings).Do()
+
+	return err
 }
 
 // Start starts the ElasticWriter under the control of the *ingest.Controller
