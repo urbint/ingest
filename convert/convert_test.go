@@ -15,6 +15,12 @@ func TestConvert(t *testing.T) {
 			Convey("works with other types", func() {
 				So(ToString(1), ShouldEqual, "1")
 			})
+			Convey("works with pointers", func() {
+				So(ToString(nil), ShouldEqual, "")
+
+				var typedPtr *int
+				So(ToString(typedPtr), ShouldEqual, "")
+			})
 		})
 
 		Convey("ToInt", func() {

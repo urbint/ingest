@@ -13,7 +13,13 @@ func ToString(val interface{}) string {
 	switch asVal := val.(type) {
 	case string:
 		return asVal
+	case nil:
+		return ""
 	default:
+		value := reflect.ValueOf(val)
+		if value.Type().Kind() == reflect.Ptr && value.IsNil() {
+			return ""
+		}
 		return fmt.Sprintf("%v", asVal)
 	}
 }
@@ -48,10 +54,7 @@ func ToBool(val interface{}) bool {
 		}
 	}
 
-	value := unwrapPtr(reflect.ValueOf(val))
-	zeroVal := reflect.Zero(value.Type())
-
-	return !reflect.DeepEqual(value.Interface(), zeroVal.Interface())
+	return !isZeroVal(val)
 }
 
 // ToFloat32 converts an interface to a float32
@@ -134,4 +137,11 @@ func toParsable(str string) string {
 	str = strings.Replace(str, " ", "", -1)
 	str = strings.Replace(str, ",", "", -1)
 	return str
+}
+
+func isZeroVal(val interface{}) bool {
+	value := unwrapPtr(reflect.ValueOf(val))
+	zeroVal := reflect.Zero(value.Type())
+
+	return reflect.DeepEqual(value.Interface(), zeroVal.Interface())
 }
