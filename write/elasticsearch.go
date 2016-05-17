@@ -230,6 +230,7 @@ func (e *ElasticWriter) afterFlush(id int64, requests []elastic.BulkableRequest,
 	}
 
 	recsStored := atomic.LoadUint32(&e.pendingCount)
+	e.Log.WithField("recsStored", recsStored).Debug("ElasticSearch flushed")
 	atomic.StoreUint32(&e.pendingCount, 0)
 
 	if e.Opts.Progress != nil {
