@@ -162,8 +162,9 @@ func (u *Unzipper) UnzipFile(file *os.File) ([]io.ReadCloser, error) {
 
 	for _, inside := range archive.File {
 		name := inside.FileHeader.Name
+		fileLog := u.Log.WithField("file", name)
 		if u.filterMatch(name) {
-			u.Log.WithField("file", name).Debug("Found file")
+			fileLog.Debug("Found file")
 			opened, err := inside.Open()
 			if err != nil {
 				// We errored, close all of the open files before returning the error
@@ -173,6 +174,8 @@ func (u *Unzipper) UnzipFile(file *os.File) ([]io.ReadCloser, error) {
 				return nil, err
 			}
 			result = append(result, opened)
+		} else {
+			fileLog.Debug("Skipping file")
 		}
 	}
 
