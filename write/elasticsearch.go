@@ -144,7 +144,7 @@ func (e *ElasticWriter) CreateIndexWithSettings(indexName string, settingsPath s
 		return nil
 	}
 
-	if recreate {
+	if exists && recreate {
 		if _, err = e.es.DeleteIndex(indexName).Do(); err != nil {
 			return err
 		}
