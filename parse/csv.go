@@ -27,7 +27,7 @@ type CSVDecodeError struct {
 }
 
 func (c *CSVDecodeError) Error() string {
-	return fmt.Sprintf("Parse Error: %s", c.SrcErr.Error())
+	return fmt.Sprintf("Decode Error: %s", c.SrcErr.Error())
 }
 
 // A CSVParser handles parsing CSV
@@ -192,6 +192,7 @@ func (c *CSVParser) Decode(input io.ReadCloser, abort chan struct{}) (chan inter
 				rec, err := c.parseRowWithFieldMap(row, fieldMap)
 				if err != nil {
 					errs <- err
+					continue
 				}
 				select {
 				case <-abort:
