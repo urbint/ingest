@@ -14,6 +14,12 @@ import (
 	"github.com/urbint/ingest"
 )
 
+// CSVUnmarshaler is an interface that a struct can implement to handle decoding a CSV row directly.
+// This can be much faster than using the reflection based approach
+type CSVUnmarshaler interface {
+	UnmarshalCSVRow(row []string) error
+}
+
 // CSVDecodeError is an error encountered while decoding a parsed CSV row into
 // an interface
 type CSVDecodeError struct {
@@ -262,6 +268,12 @@ func (c *CSVParser) parseHeaderForType(header []string, mapper interface{}) map[
 // parseRowWithFieldMap reads a single row with the specified field map and returns a newly built record
 func (c *CSVParser) parseRowWithFieldMap(row []string, fieldMap map[int][]int) (rec interface{}, err error) {
 	rec = c.newRec()
+	if asUnmarshaler, canUnmarshal := rec.(CSVUnmarshaler); canUnmarshal {
+		if err := asUnmarshaler.UnmarshalCSVRow(row); err != nil {
+			return nil, &CSVDecodeError{fmt.Errorf("Error parsing row\n  message: %s\n  row: %v", err.Error(), row)}
+		}
+		return rec, nil
+	}
 	instance := reflect.ValueOf(rec).Elem()
 
 	for j := 0; j < len(row); j++ {
