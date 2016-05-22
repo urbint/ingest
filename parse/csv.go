@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -38,8 +39,8 @@ type CSVParser struct {
 // CSVParserOpts are used to configure a CSVParser
 type CSVParserOpts struct {
 	AbortOnError bool
-	TrimSpaces   bool   `default:"true"`
-	NumWorkers   int    `default:"1"`
+	TrimSpaces   bool `default:"true"`
+	NumWorkers   int
 	DateFormat   string `default:"01/02/2006"`
 	Progress     chan struct{}
 }
@@ -52,6 +53,7 @@ func NewCSVParser() *CSVParser {
 	}
 
 	defaults.SetDefaults(&parser.Opts)
+	parser.Opts.NumWorkers = runtime.NumCPU()
 	return parser
 }
 
