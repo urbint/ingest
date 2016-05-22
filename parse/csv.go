@@ -115,6 +115,13 @@ func (c *CSVParser) Struct(rec interface{}) *CSVParser {
 	return c
 }
 
+// AllocateWith is a chainable configuration method that specifies a function to be called
+// to allocate a new record. This allows for much more performant allocation than reflect-based allocation
+func (c *CSVParser) AllocateWith(fn func() interface{}) *CSVParser {
+	c.newRec = fn
+	return c
+}
+
 // Start starts running the parser under the control of the specified controller
 func (c *CSVParser) Start(ctrl *ingest.Controller) chan interface{} {
 	if c.newRec == nil {
