@@ -100,13 +100,19 @@ func ToFloat64(val interface{}) float64 {
 // ToTime converts a val to a time.
 //
 // If val is a string, it will be parsed with an optional formatStr argument
-// If no formatStr is specified, RFC3339 will be used by default
+// If no formatStr is specified, RFC3339 will be used by default,
+// except when the string is 10 chars long (and "2006-01-02" is assumed)
 //
 // If val is a int, it will be used as a unix epoc
 func ToTime(val interface{}, formatStr ...string) time.Time {
 	switch asVal := val.(type) {
 	case string:
-		layout := time.RFC3339
+		var layout string
+		if len(asVal) == 10 {
+			layout = "2006-01-02"
+		} else {
+			layout = time.RFC3339
+		}
 		if len(formatStr) > 0 && formatStr[0] != "" {
 			layout = formatStr[0]
 		}

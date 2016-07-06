@@ -66,8 +66,14 @@ func MapToStruct(src map[string]interface{}, dest interface{}, lookupKey ...stri
 			}
 		case reflect.Ptr:
 			ptr := reflect.New(fieldValue.Type().Elem())
-			MapToStruct(srcVal.(map[string]interface{}), ptr.Interface(), lookupTag)
-			fieldValue.Set(ptr)
+			switch ptr.Interface().(type) {
+			case *time.Time:
+				parsed := ToTime(srcVal, structField.Tag.Get("format"))
+				fieldValue.Set(reflect.ValueOf(&parsed))
+			default:
+				MapToStruct(srcVal.(map[string]interface{}), ptr.Interface(), lookupTag)
+				fieldValue.Set(ptr)
+			}
 		}
 	}
 

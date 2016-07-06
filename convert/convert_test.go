@@ -104,11 +104,13 @@ func TestConvert(t *testing.T) {
 					"First": "Bobby",
 					"Last":  "Johnson",
 				},
-				"Age":           42,
-				"FriendCount":   "58",
-				"FavoriteFloat": "32.8",
-				"Birthday":      "2016-05-17T22:34:28.323Z",
-				"CustomDate":    "2010-05-01",
+				"Age":              42,
+				"FriendCount":      "58",
+				"FavoriteFloat":    "32.8",
+				"Birthday":         "2016-05-17T22:34:28.323Z",
+				"CustomDate":       "2010-05-01",
+				"PointerDate":      "2000-01-10",
+				"PointerDateNoFmt": "2016-05-17",
 			}
 
 			type Name struct {
@@ -122,13 +124,15 @@ func TestConvert(t *testing.T) {
 
 			type Person struct {
 				Anonymous
-				Name          Name
-				AltName       *Name
-				Age           int `source:"age"`
-				FriendCount   int
-				FavoriteFloat float32
-				Birthday      time.Time
-				CustomDate    time.Time `format:"2006-01-02"`
+				Name             Name
+				AltName          *Name
+				Age              int `source:"age"`
+				FriendCount      int
+				FavoriteFloat    float32
+				Birthday         time.Time
+				CustomDate       time.Time  `format:"2006-01-02"`
+				PointerDate      *time.Time `format:"2006-01-02"`
+				PointerDateNoFmt *time.Time
 			}
 
 			p := &Person{}
@@ -175,6 +179,12 @@ func TestConvert(t *testing.T) {
 				Convey("uses a default time format", func() {
 					So(p.Birthday, ShouldHappenAfter, time.Time{})
 					So(p.Birthday, ShouldHappenBefore, time.Now())
+				})
+				Convey("handles times as a pointer", func() {
+					So(*p.PointerDate, ShouldHappenAfter, time.Time{})
+					So(*p.PointerDate, ShouldHappenBefore, time.Now())
+					So(*p.PointerDateNoFmt, ShouldHappenAfter, time.Time{})
+					So(*p.PointerDateNoFmt, ShouldHappenBefore, time.Now())
 				})
 				Convey("allows configuration of a custom time format", nil)
 			})
