@@ -46,6 +46,7 @@ type CSVParser struct {
 type CSVParserOpts struct {
 	AbortOnError bool
 	TrimSpaces   bool `default:"true"`
+	Delimiter    rune `default:","`
 	NumWorkers   int
 	DateFormat   string `default:"01/02/2006"`
 	Progress     chan struct{}
@@ -81,6 +82,12 @@ func (c *CSVParser) AbortOnError(abort bool) *CSVParser {
 // the parser will trim spaces around rows
 func (c *CSVParser) TrimSpaces(trim bool) *CSVParser {
 	c.Opts.TrimSpaces = trim
+	return c
+}
+
+// Delimiter is a chainable configuration method that overwrites the default delimiter
+func (c *CSVParser) Delimiter(char rune) *CSVParser {
+	c.Opts.Delimiter = char
 	return c
 }
 
@@ -167,6 +174,8 @@ func (c *CSVParser) Decode(input io.ReadCloser, abort chan struct{}) (chan inter
 		defer func() { close(done) }()
 
 		reader := csv.NewReader(input)
+		reader.Comma = c.Opts.Delimiter
+
 		defer input.Close()
 
 		header, err := reader.Read()
