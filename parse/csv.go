@@ -47,6 +47,7 @@ type CSVParserOpts struct {
 	AbortOnError bool
 	TrimSpaces   bool `default:"true"`
 	Delimiter    rune `default:","`
+	LazyQuotes   bool `default:"false"`
 	NumWorkers   int
 	DateFormat   string `default:"01/02/2006"`
 	Progress     chan struct{}
@@ -88,6 +89,12 @@ func (c *CSVParser) TrimSpaces(trim bool) *CSVParser {
 // Delimiter is a chainable configuration method that overwrites the default delimiter
 func (c *CSVParser) Delimiter(char rune) *CSVParser {
 	c.Opts.Delimiter = char
+	return c
+}
+
+// LazyQuotes is a chainable configuration method that sets the LazyQuotes option for the parser
+func (c *CSVParser) LazyQuotes(lazy bool) *CSVParser {
+	c.Opts.LazyQuotes = lazy
 	return c
 }
 
@@ -175,6 +182,7 @@ func (c *CSVParser) Decode(input io.ReadCloser, abort chan struct{}) (chan inter
 
 		reader := csv.NewReader(input)
 		reader.Comma = c.Opts.Delimiter
+		reader.LazyQuotes = c.Opts.LazyQuotes
 
 		defer input.Close()
 
