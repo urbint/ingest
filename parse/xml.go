@@ -26,6 +26,8 @@ type XMLParseOpts struct {
 	AbortOnError bool
 	NumWorkers   int `default:"1"`
 	Progress     chan struct{}
+	Strict       bool `default:"true"`
+	Entities     map[string]string
 }
 
 // NewXMLParser builds a XMLParser. You will usually want to use parse.XML instead
@@ -62,6 +64,18 @@ func XMLReader(input io.ReadCloser) *XMLParser {
 // Select sets the Selection that will be used to parse the specified XML
 func (x *XMLParser) Select(selection string) *XMLParser {
 	x.Opts.Selection = selection
+	return x
+}
+
+// Strict is a chainable configuration method that sets the Strict option for the parser
+func (x *XMLParser) Strict(strict bool) *XMLParser {
+	x.Opts.Strict = strict
+	return x
+}
+
+// EntityMap is a chainable configuration method that sets the Entities for the parser
+func (x *XMLParser) EntityMap(entities map[string]string) *XMLParser {
+	x.Opts.Entities = entities
 	return x
 }
 
@@ -178,6 +192,8 @@ func (x *XMLParser) Decode(reader io.Reader, abort chan struct{}) (done chan str
 		defer func() { close(done) }()
 
 		decoder := xml.NewDecoder(reader)
+		decoder.Strict = x.Opts.Strict
+		decoder.Entity = x.Opts.Entities
 
 		for {
 			select {
@@ -192,8 +208,10 @@ func (x *XMLParser) Decode(reader io.Reader, abort chan struct{}) (done chan str
 					continue
 				}
 				rec := x.newRec()
+				found := false
 				if se, ok := token.(xml.StartElement); ok {
 					if se.Name.Local == x.Opts.Selection {
+						found = true
 						if err := decoder.DecodeElement(rec, &se); err != nil {
 							errs <- err
 							if x.Opts.AbortOnError {
@@ -202,12 +220,14 @@ func (x *XMLParser) Decode(reader io.Reader, abort chan struct{}) (done chan str
 						}
 					}
 				}
-				select {
-				case <-abort:
-					return
-				case x.Out <- rec:
-					x.reportProgress()
-					continue
+				if found {
+					select {
+					case <-abort:
+						return
+					case x.Out <- rec:
+						x.reportProgress()
+						continue
+					}
 				}
 			}
 		}
