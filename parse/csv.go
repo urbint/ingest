@@ -39,18 +39,20 @@ type CSVParser struct {
 	Out    chan interface{}
 	newRec func() interface{}
 
-	depGroup *ingest.DependencyGroup
+	depGroup  *ingest.DependencyGroup
+	delimiter rune
 }
 
 // CSVParserOpts are used to configure a CSVParser
 type CSVParserOpts struct {
-	AbortOnError bool
-	TrimSpaces   bool `default:"true"`
-	Delimiter    rune `default:","`
-	LazyQuotes   bool `default:"false"`
-	NumWorkers   int
-	DateFormat   string `default:"01/02/2006"`
-	Progress     chan struct{}
+	AbortOnError   bool
+	TrimSpaces     bool `default:"true"`
+	TrimFloats     bool `default:"false"`
+	LazyQuotes     bool `default:"false"`
+	NumWorkers     int
+	DateFormat     string `default:"01/02/2006"`
+	Progress       chan struct{}
+	HeaderRowIndex int `default:"0"`
 }
 
 // NewCSVParser builds a CSVParser. Usually, parse.CSV is preferred
@@ -61,6 +63,7 @@ func NewCSVParser() *CSVParser {
 	}
 
 	defaults.SetDefaults(&parser.Opts)
+	parser.delimiter = ','
 	parser.Opts.NumWorkers = runtime.NumCPU()
 	return parser
 }
@@ -86,9 +89,23 @@ func (c *CSVParser) TrimSpaces(trim bool) *CSVParser {
 	return c
 }
 
+// TrimFloats is a chainable configuration method that sets whether
+// the parser will trim spaces around rows
+func (c *CSVParser) TrimFloats(trim bool) *CSVParser {
+	c.Opts.TrimFloats = trim
+	return c
+}
+
+// HeaderRowIndex is a chainable configuration method that sets whether
+// the row to pull the header from
+func (c *CSVParser) HeaderRowIndex(idx int) *CSVParser {
+	c.Opts.HeaderRowIndex = idx
+	return c
+}
+
 // Delimiter is a chainable configuration method that overwrites the default delimiter
 func (c *CSVParser) Delimiter(char rune) *CSVParser {
-	c.Opts.Delimiter = char
+	c.delimiter = char
 	return c
 }
 
@@ -179,13 +196,16 @@ func (c *CSVParser) Decode(input io.ReadCloser, abort chan struct{}) (chan inter
 
 	go func() {
 		defer func() { close(done) }()
-
 		reader := csv.NewReader(input)
-		reader.Comma = c.Opts.Delimiter
+		reader.Comma = c.delimiter
 		reader.LazyQuotes = c.Opts.LazyQuotes
-
 		defer input.Close()
-
+		for i := 0; i < c.Opts.HeaderRowIndex; i++ {
+			if _, err := reader.Read(); err != nil {
+				errs <- err
+				return
+			}
+		}
 		header, err := reader.Read()
 		if err != nil {
 			errs <- err
@@ -205,7 +225,6 @@ func (c *CSVParser) Decode(input io.ReadCloser, abort chan struct{}) (chan inter
 					errs <- err
 					continue
 				}
-
 				rec, err := c.parseRowWithFieldMap(row, fieldMap)
 				if err != nil {
 					errs <- err
@@ -311,11 +330,14 @@ func (c *CSVParser) parseRowWithFieldMap(row []string, fieldMap map[int][]int) (
 		fieldInterface := field.Interface()
 		switch fieldInterface.(type) {
 		case string:
+			str := row[j]
 			if c.Opts.TrimSpaces {
-				field.SetString(strings.TrimSpace(row[j]))
-			} else {
-				field.SetString(row[j])
+				str = strings.TrimSpace(str)
 			}
+			if c.Opts.TrimFloats {
+				str = strings.TrimRight(strings.TrimRight(str, "0"), ".")
+			}
+			field.SetString(str)
 		case float32:
 			val, err := strconv.ParseFloat(row[j], 32)
 			if err != nil {
